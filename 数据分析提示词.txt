@@ -110,26 +110,29 @@
 ]
 ```
 
-# Data Binding Rules
-为了彻底解决数据视图 (DataView) 表头错位问题，必须严格遵守以下数据注入方式：
+# ECharts 数据绑定规范 (解决 DataView 错位)
+由于底层引擎缺陷，使用 dataset 会导致数据视图表头错位丢失。因此，**绝对严禁使用 dataset**！你必须严格按以下模板，分别向 `xAxis.data` 和 `series.data` 注入数据，并**强制设置 X 轴名称**：
 
-1. **必须使用 dataset**: **绝对严禁**在 `xAxis` 和 `series` 内部配置 `data` 数组！必须使用全局的 `dataset.source` 统一传入二维数组。
-2. **强制构建表头**: `dataset.source` 的**第一行必须是完整的字符串表头**（第一列是X轴维度名，后面是各项指标名）。
-3. **Python 代码构建模板（必须照做）**:
 ```python
-## 1. 明确你要展示的维度列和指标列
-dim_col = '你的X轴列名'
-metric_cols = ['指标列1', '指标列2'] # 可以是一个或多个指标
+# 1. 提取数据为独立列表
+x_data = df['你的X轴列名'].astype(str).tolist()
+y_data_1 = df['指标1'].tolist()
 
-## 2. 提取数据为二维列表，必须将表头放在第一行！
-header = [dim_col] + metric_cols
-source_data = [header] + df[[dim_col] + metric_cols].values.tolist()
-
-## 3. 生成配置 (保持极简，让 ECharts 自动映射)
+# 2. 生成配置 (必须显式给 xAxis 设置 name，绝不能空着，否则 DataView 依然会错位！)
 echarts_option = {
-    "dataset": { "source": source_data },
-    "xAxis": { "type": "category" }, # 绝对禁止在这里写 data
+    "xAxis": {
+        "type": "category",
+        "name": "必须填入明确名称(如:日期/类型)", # <--- 解决表头错位的核心！绝对不能遗漏！
+        "data": x_data,
+        "axisLabel": { "interval": 0, "rotate": 30 }
+    },
     "yAxis": { "type": "value" },
-    "series": [ {"type": "bar"} for _ in metric_cols ], # 根据指标数量生成 series，绝对禁止写 data
+    "series": [
+        {
+            "name": "指标1名称",
+            "type": "bar",
+            "data": y_data_1
+        }
+    ],
     # ... title, toolbox, tooltip, grid 等其他样式配置按前文要求保持不变 ...
 }
